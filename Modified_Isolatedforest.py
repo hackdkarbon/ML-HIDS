@@ -7,7 +7,6 @@ Created on Sun Oct 1 07:25:16 2023
 import pandas as pd
 import numpy as np
 import re
-import mysql.connector
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
@@ -20,16 +19,20 @@ import logging
 from sklearn.pipeline import FeatureUnion
 from sklearn.preprocessing import FunctionTransformer
 import ipaddress
+import seaborn as sns
+import matplotlib.pyplot as plt
+from scipy.stats import zscore
+#import mysql.connector
 #import tensorflow as tf
 #from tensorflow.keras.models import Model
 #from tensorflow.keras.layers import Input, Dense
 
 # logging.basicConfig(level=logging.INFO)
 # Define the format and filename for logging
-logging.basicConfig(filename='D:\Temporary\SNORT_ML_Project\Python\IsoForest_data_processor.log', level=logging.INFO, 
+logging.basicConfig(filename='D:\Temporary\SNORT_ML_Project\Python\Final_codes\IsoForest_data_processor.log', level=logging.INFO, 
                     format='%(asctime)s - %(levelname)s - %(message)s')
 error_logger = logging.getLogger('error_logger')
-error_logger.addHandler(logging.FileHandler('D:\Temporary\SNORT_ML_Project\Python\Isoforesterror.log'))
+error_logger.addHandler(logging.FileHandler('D:\Temporary\SNORT_ML_Project\Python\Final_codes\Isoforesterror.log'))
 
 class DataProcessor:
     def __init__(self, df):
@@ -55,11 +58,21 @@ class DataProcessor:
             self.categorical_cols = self.df.select_dtypes(include=['object']).columns.tolist()
             self.continuous_cols = self.df.select_dtypes(include=['float64', 'int64']).columns.tolist()
 
-            for col in self.df.columns:
-                if pd.to_datetime(self.df[col], errors='coerce').notna().any():
+            for col in self.categorical_cols:
+                # Improved robust datetime check:
+                is_datetime = False
+                try:
+                    is_datetime = all(pd.to_datetime(self.df[col], errors='coerce').notna())
+                except Exception as e:
+                    logging.warning(f"Unable to check datetime for column {col}: {str(e)}")
+                
+                if is_datetime:
                     self.df[col] = pd.to_datetime(self.df[col]).astype(int) / 10 ** 9
                     if col not in self.continuous_cols:
                         self.continuous_cols.append(col)
+                    self.categorical_cols.remove(col)
+                    
+            logging.info("Columns identified and converted where necessary.")
         except Exception as e:
             logging.error(f"Error in identifying and converting columns: {str(e)}")
             raise
@@ -125,18 +138,78 @@ class DataProcessor:
         except Exception as e:
             logging.error(f"Error in preprocessing data: {str(e)}")
             raise
+            
+    def perform_eda(self):
+        """
+        Perform exploratory data analysis on the dataset.
+        """
+        try:
+            # Correlation Matrix Heatmap
+            correlation_matrix = self.df.corr()
+            sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm')
+            plt.title('Correlation Matrix of All Features')
+            plt.show()
+
+            # Assuming you have a target variable to pass as hue
+            sns.pairplot(self.df, hue='target_variable_name')  # replace with the actual target variable name
+
+            # Scatter Plot
+            plt.scatter(self.df['feature_1'], self.df['feature_2'])
+            plt.xlabel('Feature 1')
+            plt.ylabel('Feature 2')
+            plt.title('Scatter plot between Feature 1 and Feature 2')
+            plt.show()
+
+            # Boxplot
+            sns.boxplot(data=self.df[['feature_1', 'feature_2']])
+            plt.show()
+            
+            # Identifying outliers using Z-Score
+            for column_name in self.df.select_dtypes(include=np.number).columns:
+                z_scores = np.abs(zscore(self.df[column_name]))
+                outliers_z = (z_scores > 3)
+                # Log or print some info about the outliers
+                num_outliers = np.sum(outliers_z)
+                print(f"Feature: {column_name}, Outliers using Z-Score: {num_outliers}")
+                
+            # Identifying outliers using IQR
+            # Loop through all numeric columns
+            for column_name in self.df.select_dtypes(include=np.number).columns:
+                # Identifying outliers using IQR
+                Q1 = self.df[column_name].quantile(0.25)
+                Q3 = self.df[column_name].quantile(0.75)
+                IQR = Q3 - Q1
+                outliers_iqr = ((self.df[column_name] < (Q1 - 1.5 * IQR)) | (self.df[column_name] > (Q3 + 1.5 * IQR)))
+
+                # Log or print some info about the outliers
+                num_outliers = np.sum(outliers_iqr)
+                print(f"Feature: {column_name}, Outliers using IQR: {num_outliers}")
+                
+                # Visualization: Boxplot with outliers marked
+                plt.figure(figsize=(10, 6))
+                sns.boxplot(x=self.df[column_name])
+                plt.scatter(np.where(outliers_iqr), self.df[column_name][outliers_iqr], marker='o', color='r', s=100)
+                plt.title(f"Boxplot of {column_name} with Outliers Identified using IQR")
+                plt.show()
+                
+            
+            # Maybe visualize or log the outliers here.
+            
+        except Exception as e:
+            logging.error(f"Error performing exploratory data analysis: {str(e)}")        
+
 
 def main():
     sep_pattern = r'[;,\|]'
-    try:
-        conn = mysql.connector.connect(host="localhost",user="yourusername",password="yourpassword",database="yourdatabase")  # 0: minimal, 1: all, 2: non-numeric, 3: none
-        query = "SELECT * FROM tablename"
-        df = pd.read_sql(query, conn)
+    file_path = 'D:/Temporary/SNORT_ML_Project/Python/Final_codes/mydata.csv'
 
-        # Replacing any whitespace sequence with a single space and stripping leading/trailing whitespaces.
+    try:
+        # Omitting error_bad_lines parameter
+        df = pd.read_csv(file_path, sep=sep_pattern, engine='python', error_bad_lines=False, warn_bad_lines=True)
         df = df.applymap(lambda x: ' '.join(str(x).split()) if isinstance(x, str) else x)
+        logging.info(f"Data loaded successfully from {file_path}.")
     except FileNotFoundError:
-        logging.error("Data file not found.")
+        logging.error(f"Data file not found at path: {file_path}.")
         return
     except pd.errors.EmptyDataError:
         logging.error("Data file is empty.")
@@ -144,10 +217,12 @@ def main():
     except Exception as e:
         logging.error(f"Error in reading data file: {str(e)}")
         return
-
+    
     try:
         processor = DataProcessor(df)
+        processor.perform_eda() 
         pipeline = processor.preprocess_data()
+        logging.info("Data preprocessed successfully.")
     except Exception as e:
         logging.error(f"Error in initializing DataProcessor or preprocessing data: {str(e)}")
         return
