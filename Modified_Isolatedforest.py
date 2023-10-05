@@ -7,6 +7,7 @@ Created on Sun Oct 1 07:25:16 2023
 import pandas as pd
 import numpy as np
 import re
+import mysql.connector
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
@@ -128,13 +129,9 @@ class DataProcessor:
 def main():
     sep_pattern = r'[;,\|]'
     try:
-        df = pd.read_csv('D:\\Temporary\\SNORT_ML_Project\\Python\\packets.csv',  # Replace with your data file
-                         sep=sep_pattern,
-                         engine='python',
-                         error_bad_lines=False,
-                         warn_bad_lines=True,
-                         quotechar='"',
-                         quoting=0)  # 0: minimal, 1: all, 2: non-numeric, 3: none
+        conn = mysql.connector.connect(host="localhost",user="yourusername",password="yourpassword",database="yourdatabase")  # 0: minimal, 1: all, 2: non-numeric, 3: none
+        query = "SELECT * FROM tablename"
+        df = pd.read_sql(query, conn)
 
         # Replacing any whitespace sequence with a single space and stripping leading/trailing whitespaces.
         df = df.applymap(lambda x: ' '.join(str(x).split()) if isinstance(x, str) else x)
