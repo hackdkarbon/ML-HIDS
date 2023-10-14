@@ -23,6 +23,7 @@ from sklearn.preprocessing import FunctionTransformer
 import ipaddress
 import seaborn as sns
 import matplotlib.pyplot as plt
+from joblib import dump
 from scipy.stats import zscore
 
 # logging.basicConfig(level=logging.INFO)
@@ -343,6 +344,7 @@ def main():
     y_val = None, None
 
   pipeline.fit(X_train)
+  dump(pipeline, 'pickles/pipeline.pkl')
 
   if y_val is not None:
     scores = pipeline.decision_function(X_val)
