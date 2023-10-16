@@ -64,18 +64,18 @@ class DataProcessor:
         # Improved robust datetime check:
         is_datetime = False
         try:
-          for col in df.columns:
-            if df[col].dtype == 'object':
-              try:
-                df[col] = pd.to_datetime(df[col])
-              except ValueError:
-                pass
-          is_datetime = True
-        except Exception as e:
+           for col in df.columns:
+             if df[col].dtype == 'object':
+               try:
+                 df[col] = pd.to_datetime(df[col])
+               except ValueError:
+                 pass
+        is_datetime = True
+         except Exception as e:
           print("An exception occurred: ", e)
           #pd.to_datetime(self.df[col], errors='coerce').notna())
           #df['date_column'] = pd.to_datetime(df['date_column']
-        except Exception as e:
+         except Exception as e:
           logging.warning(
               f"Unable to check datetime for column {col}: {str(e)}")
 
@@ -270,6 +270,21 @@ class DataProcessor:
 
     except Exception as e:
       logging.error(f"Error performing exploratory data analysis: {str(e)}")
+      
+  def false_positive_rate(y_true, y_pred):
+        """
+        Compute the False Positive Rate.
+        
+        Parameters:
+        - y_true: True labels
+        - y_pred: Predicted labels
+        
+        Returns:
+        - False Positive Rate
+        """
+        FP = sum((y_true == 1) & (y_pred == -1))
+        TN = sum((y_true == 1) & (y_pred == 1))
+        return FP / (FP + TN)
 
 
 def main():
@@ -362,6 +377,11 @@ def main():
     scores = pipeline.decision_function(X_val)
     threshold = 0.1  # You may have to adjust the threshold value based on your specific use case
     predictions = [-1 if score < threshold else 1 for score in scores]
+
+    # Compute and display the False Positive Rate
+    fp_rate = false_positive_rate(y_val, predictions)
+    print(f"False Positive Rate: {fp_rate:.3f}")
+    
     print(classification_report(y_val, predictions))
 
   scores = pipeline.decision_function(X)
