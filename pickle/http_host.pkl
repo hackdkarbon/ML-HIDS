@@ -1,0 +1,4 @@
+ec2-65-0-81-65.ap-south-1.compute.amazonaws.com
+http://indiasite.com
+http://usasite.com
+http://canadasite.com
